@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<font-family xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/bubble_soap" />
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/cassandra"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/color_your_world"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/color_your_world_ttf"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/doctor_glitch"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/follow_me"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/graphe_alpha"/>
+
+    <font
+        app:fontStyle="normal"
+        app:fontWeight="400"
+        app:font="@font/graphemic"/>
+
+</font-family>

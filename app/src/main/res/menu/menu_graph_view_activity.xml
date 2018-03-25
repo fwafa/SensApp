@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".GraphViewActivity">
+
+    <item
+        android:id="@+id/action_settings"
+        android:title="Settings"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_sensor">
+
+        <menu>
+            <item
+                android:id="@+id/action_filter"
+                android:title="Filter"
+                android:checkable="true"
+                app:actionViewClass="android.widget.CheckBox"
+                app:showAsAction="always">
+            </item>
+        </menu>
+
+    </item>
+
+    <item
+        android:id="@+id/action_stop"
+        android:orderInCategory="100"
+        android:title="Pause"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_stop_24dp" />
+
+    <item
+        android:id="@+id/action_resume"
+        android:orderInCategory="100"
+        android:title="Resume"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_record_24dp" />
+
+    <item
+        android:id="@+id/action_share"
+        android:orderInCategory="100"
+        android:title="Share"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_share">
+
+        <menu>
+            <item
+                android:id="@+id/action_send"
+                android:orderInCategory="100"
+                android:title="Send"
+                app:showAsAction="ifRoom"
+                android:icon="@drawable/ic_menu_send">
+            </item>
+            <item
+                android:id="@+id/action_save"
+                android:orderInCategory="100"
+                android:title="Save"
+                app:showAsAction="ifRoom"
+                android:icon="@drawable/ic_save">
+            </item>
+        </menu>
+
+    </item>
+        <!--app:actionProviderClass="android.support.v7.widget.ShareActionProvider"-->
+
+</menu>

@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
@@ -36,23 +37,33 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.utils.ColorTemplate;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import student.fh.sensorapplication.R;
 
 public class SensorGraphActivity extends AppCompatActivity implements SensorEventListener {
+
+    private FirebaseStorage storage = FirebaseStorage.getInstance();
+    private UploadTask uploadTask;
+    private StorageReference storageReference;
 
     private SensorManager sensorMgr = null;
     private Sensor aLinearSensor = null;
@@ -71,7 +82,6 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
 
     private float xAccel, yAccel, zAccel;
     private float xGyro, yGyro, zGyro;
-
     private float[] gravity = new float[3];
 
     private static final float NS2S = 1.0f / 1000000000.0f;
@@ -82,10 +92,11 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
     private long lastTimestamp = -1;
     private long startTime = 0;
 
+    private String deviceModel = Build.MODEL;
     private String databaseValue;
     private String comma = ";";
     private String fileName = "";
-    private StringBuffer buff = new StringBuffer();
+    private StringBuffer buff = null;
     private StringBuffer titlesBuffer = new StringBuffer();
 
     private LineChart chartAccelerometer;
@@ -144,50 +155,49 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         titlesBuffer.append("Gyroscope Z");
         titlesBuffer.append("\n");
 
-
         // Die Sensoren werden auf Verfügbarkeit überprüft und registriert
         sensorMgr = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         if(sensorMgr != null)
         {
             aSensor = sensorMgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            aLinearSensor = sensorMgr.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
             gSensor = sensorMgr.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        }
 
-        if(aSensor.getType() == Sensor.TYPE_ACCELEROMETER)
-        {
-            sensorMgr.registerListener(this, aSensor, SensorManager.SENSOR_DELAY_FASTEST);
-        }
+            if(sensorMgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null)
+            {
+                sensorMgr.registerListener(this, aSensor, SensorManager.SENSOR_DELAY_FASTEST);
+            }
+            else
+            {
+                Toast.makeText(this, "Kein Accelerometer Sensor vorhanden!", Toast.LENGTH_LONG).show();
+            }
 
+            if(sensorMgr.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) != null)
+            {
+                aLinearSensor = sensorMgr.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+                sensorMgr.registerListener(this, aLinearSensor, SensorManager.SENSOR_DELAY_FASTEST);
+                isLinearAcc = true;
+            }
+            else
+            {
+                isLinearAcc = false;
+            }
 
-        if (aLinearSensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION)
-        {
-            sensorMgr.registerListener(this, aLinearSensor, SensorManager.SENSOR_DELAY_FASTEST);
-            isLinearAcc = true;
+            if(sensorMgr.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null)
+            {
+                sensorMgr.registerListener(this, gSensor, SensorManager.SENSOR_DELAY_FASTEST);
+                isGyroscope = true;
+            }
+            else
+            {
+                isGyroscope = false;
+                Toast.makeText(this, "Kein Gyroskop Sensor vorhanden!", Toast.LENGTH_LONG).show();
+            }
         }
-        else
-        {
-            isLinearAcc = false;
-        }
-
-        if (gSensor.getType() == Sensor.TYPE_GYROSCOPE)
-        {
-            sensorMgr.registerListener(this, gSensor, SensorManager.SENSOR_DELAY_FASTEST);
-            isGyroscope = true;
-        }
-        else
-        {
-            isGyroscope = false;
-            Toast.makeText(this, "Kein Gyroskop vorhanden!", Toast.LENGTH_LONG).show();
-        }
-
-
 
 
         initGraph(chartAccelerometer, "Accelerometer");
         initGraph(chartGyroscope, "Gyroscope");
-
 
         // Das Firebase-Framework "Realtime Database" dient zum Starten der Geräte zur gleichen Zeit
         DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference().child("sensor");
@@ -212,6 +222,9 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
                             startTime = System.currentTimeMillis();
                             isRunning = !isRunning;
                             updateGraph = true;
+                            isWriting = true;
+                            buff = new StringBuffer();
+                            buff.delete(0, buff.length());
                             invalidateOptionsMenu();
                             feedSensor();
                         }
@@ -224,6 +237,18 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
                             mHandler.removeCallbacksAndMessages(null);
                             sensorMgr.unregisterListener(SensorGraphActivity.this);
                         }
+                        else if(databaseValue.equalsIgnoreCase("save"))
+                        {
+                            if(buff != null)
+                            {
+                                saveFileToFireBaseStorage();
+                            }
+                            else
+                            {
+                                Toast.makeText(SensorGraphActivity.this, "Keine Daten vorhanden. Bitte zuerst starten!", Toast.LENGTH_LONG).show();
+                            }
+
+                        }
                         else
                         {
                             Toast.makeText(SensorGraphActivity.this, "Warten auf Start!", Toast.LENGTH_LONG).show();
@@ -231,19 +256,19 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
                     }
                     else
                     {
-                        Toast.makeText(SensorGraphActivity.this, "Firebase - null", Toast.LENGTH_LONG).show();
+                        Toast.makeText(SensorGraphActivity.this, "Firebase: null", Toast.LENGTH_LONG).show();
                     }
                 }
                 catch (NullPointerException e)
                 {
-                    Toast.makeText(SensorGraphActivity.this, "Warten auf Start!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError)
             {
-                Log.w("loadPost:onCancelled", databaseError.toException());
+                Log.e("onCancelled", String.valueOf(databaseError.toException().getMessage()));
             }
         });
     }
@@ -290,22 +315,6 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         YAxis rightAxis = mChart.getAxisRight();
         rightAxis.setEnabled(false);
     }
-
-
-    /*private void drawLineGraph(LineChart lineChart)
-    {
-        Paint paint = lineChart.getRenderer().getPaintRender();
-        int height = lineChart.getHeight();
-
-        LinearGradient linGrad = new LinearGradient(0, 0, 0, height,
-                getResources().getColor(android.R.color.holo_red_dark),
-                getResources().getColor(android.R.color.holo_blue_dark),
-                Shader.TileMode.REPEAT);
-        paint.setShader(linGrad);
-
-        // Don't forget to refresh the drawing
-        lineChart.invalidate();
-    }*/
 
 
     private void addEntry(LineChart chart, Float valueX, Float valueY, Float valueZ)
@@ -413,9 +422,17 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             isGyroscope = false;
         }
 
-        sensorMgr.registerListener(this, aSensor, SensorManager.SENSOR_DELAY_FASTEST);
-        chartAccelerometer.clearValues();
-        chartGyroscope.clearValues();
+        if(sensorMgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null)
+        {
+            sensorMgr.registerListener(this, aSensor, SensorManager.SENSOR_DELAY_FASTEST);
+            chartAccelerometer.clearValues();
+            chartGyroscope.clearValues();
+        }
+        else
+        {
+            Toast.makeText(this, "Kein Accelerometer Sensor vorhanden!", Toast.LENGTH_LONG).show();
+        }
+
     }
 
     @Override
@@ -438,6 +455,14 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
 
 
     @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        storage = null;
+        sensorMgr.unregisterListener(this);
+        buff = null;
+    }
+
+    @Override
     public void onSensorChanged(SensorEvent event)
     {
         final float[] aValues = event.values;
@@ -449,7 +474,6 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         long millis = System.currentTimeMillis() - startTime;
         long second = TimeUnit.MILLISECONDS.toSeconds(millis);
         long minute = TimeUnit.MILLISECONDS.toMinutes(millis);
-        long hour = TimeUnit.MILLISECONDS.toHours(millis);
         millis -= TimeUnit.SECONDS.toMillis(second);
 
 
@@ -543,7 +567,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         {
             if(elapsedTime >= TIMEOUT)
             {
-                String dateString = String.format(Locale.GERMANY, "%02d:%02d:%02d.%d", hour, minute, second, (millis / 100 * 100));
+                String dateString = String.format(Locale.GERMANY, "%02d:%02d.%d", minute, second, (millis / 100 * 100));
 
                 buff.append(String.valueOf(dateString));
                 buff.append(comma);
@@ -576,7 +600,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
     {
         getMenuInflater().inflate(R.menu.menu_graph_view_activity, menu);
 
-        boolean isChecked = loadState();
+        boolean isChecked = loadState("checkboxValue");
         MenuItem item = menu.findItem(R.id.action_filter);
         item.setChecked(isChecked);
         if(item.isChecked())
@@ -603,7 +627,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
 
                 isFilter = !isFilter;
                 item.setChecked(!item.isChecked());
-                saveState(item.isChecked());
+                saveState(item.isChecked(), "checkboxValue");
                 break;
 
             case R.id.action_stop:
@@ -620,6 +644,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
                 isRunning = !isRunning;
                 updateGraph = true;
                 isWriting = true;
+                buff = new StringBuffer();
                 buff.delete(0, buff.length());
                 feedSensor();
                 invalidateOptionsMenu();
@@ -674,6 +699,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             public void onClick(DialogInterface dialog, int which) {
                 fileName = (input.getText().toString());
                 saveFile();
+                saveFileToFireBaseStorage(fileName);
             }
         });
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -748,7 +774,60 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         {
             Toast.makeText(getApplicationContext(), "Keine Daten vorhanden!", Toast.LENGTH_LONG).show();
         }
+    }
 
+
+    private void saveFileToFireBaseStorage()
+    {
+        byte[] one = String.valueOf(titlesBuffer).getBytes();
+        byte[] two = String.valueOf(buff).getBytes();
+        byte[] combined = new byte[one.length + two.length];
+        System.arraycopy(one,0,combined,0         ,one.length);
+        System.arraycopy(two,0,combined,one.length,two.length);
+
+        String mPath = "Sensordaten/" + deviceModel + "_" + new Date().getTime() + ".csv";
+        storageReference = storage.getReference(mPath);
+        uploadTask = storageReference.putBytes(combined);
+        uploadTask.addOnSuccessListener(SensorGraphActivity.this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot)
+            {
+                Toast.makeText(SensorGraphActivity.this, "Zu Firebase Storage hinzugefügt!", Toast.LENGTH_LONG).show();
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e)
+            {
+                Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+
+    private void saveFileToFireBaseStorage(String fileName)
+    {
+        byte[] one = String.valueOf(titlesBuffer).getBytes();
+        byte[] two = String.valueOf(buff).getBytes();
+        byte[] combined = new byte[one.length + two.length];
+        System.arraycopy(one,0,combined,0         ,one.length);
+        System.arraycopy(two,0,combined,one.length,two.length);
+
+        String mPath = "Sensordaten/" + deviceModel + "_" + fileName + ".csv";
+        storageReference = storage.getReference(mPath);
+        uploadTask = storageReference.putBytes(combined);
+        uploadTask.addOnSuccessListener(SensorGraphActivity.this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot)
+            {
+                Toast.makeText(SensorGraphActivity.this, "Zu Firebase Storage hinzugefügt!", Toast.LENGTH_LONG).show();
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e)
+            {
+                Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
 
@@ -783,15 +862,15 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         revokeUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
     }
 
-    private void saveState(final boolean isChecked) {
-        SharedPreferences sharedPref = getSharedPreferences("myValue", MODE_PRIVATE);
+    private void saveState(final boolean isChecked, String value) {
+        SharedPreferences sharedPref = getSharedPreferences(value, MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean("checkboxState", isChecked);
         editor.apply();
     }
 
-    private boolean loadState() {
-        SharedPreferences sharedPref = getSharedPreferences("myValue", MODE_PRIVATE);
+    private boolean loadState(String value) {
+        SharedPreferences sharedPref = getSharedPreferences(value, MODE_PRIVATE);
         return sharedPref.getBoolean("checkboxState", false);
     }
 }

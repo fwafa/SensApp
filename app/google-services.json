@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "19405868133",
-    "firebase_url": "https://sensorapplication-49dea.firebaseio.com",
-    "project_id": "sensorapplication-49dea",
-    "storage_bucket": "sensorapplication-49dea.appspot.com"
+    "project_number": "675390252212",
+    "firebase_url": "https://sensorapplication-79c45.firebaseio.com",
+    "project_id": "sensorapplication-79c45",
+    "storage_bucket": "sensorapplication-79c45.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:19405868133:android:9ea39afc631bb102",
+        "mobilesdk_app_id": "1:675390252212:android:9ea39afc631bb102",
         "android_client_info": {
           "package_name": "student.fh.sensorapplication"
         }
       },
       "oauth_client": [
         {
-          "client_id": "19405868133-ct24m2n4u6affk4jdhkh9ch0l8ll3kuk.apps.googleusercontent.com",
+          "client_id": "675390252212-p0i0vdkft7asnvp6g2qtrj0799pne4s6.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "student.fh.sensorapplication",
@@ -23,13 +23,13 @@
           }
         },
         {
-          "client_id": "19405868133-vr7s523bshdao5s12bv3em8ava2qi2mp.apps.googleusercontent.com",
+          "client_id": "675390252212-g117s3qk14od9lc5l34jvkvnisiqj6qr.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAbYzs8AfwYhKTc6BILuOn0ooRMS9gGjww"
+          "current_key": "AIzaSyAQRx_vUgFJvXHb4kLjsFt3ZX7yZx-5j6M"
         }
       ],
       "services": {
@@ -40,7 +40,7 @@
           "status": 2,
           "other_platform_oauth_client": [
             {
-              "client_id": "19405868133-vr7s523bshdao5s12bv3em8ava2qi2mp.apps.googleusercontent.com",
+              "client_id": "675390252212-g117s3qk14od9lc5l34jvkvnisiqj6qr.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

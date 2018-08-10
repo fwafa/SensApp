@@ -8,5 +8,15 @@
     <string name="text_info_2">Farhad Wafa\nFB2: Informatik &amp;\nIngenieurwissenschaften</string>
     <string name="firebase_text">Durch den Button werden alle Geräte zur gleichen Zeit gestartet oder gestoppt.
         \nDas hierfür verwendete Framework heißt "Firebase Realtime Database"</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
+    <string name="upload_to_firebase">Upload to Firebase</string>
+    <string name="settings">Settings</string>
+    <string name="filter">Filter</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="save">Save</string>
+    <string name="hosts_suchen">Hosts suchen</string>
+    <string name="verbundene_ger_te">Verbundene Geräte</string>
 
 </resources>

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/relativeLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#69caff"
+    tools:context="student.fh.sensorapplication.Activities.NearbyActivity">
+
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_margin="8dp"
+        android:textSize="20sp"
+        android:textColor="#001b96"
+        android:text="@string/verbundene_ger_te" />
+
+
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tvTitle"
+        android:layout_margin="8dp"
+        android:scrollbars="vertical"/>
+
+
+    <com.github.clans.fab.FloatingActionMenu
+        android:id="@+id/fabMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp"
+        app:menu_backgroundColor="@android:color/transparent"
+        app:menu_fab_label=""
+        app:menu_openDirection="up"
+        app:menu_colorNormal="@android:color/holo_purple"
+        app:menu_colorPressed="#E75043"
+        app:menu_colorRipple="#99FFFFFF"
+        app:menu_animationDelayPerItem="50"
+        app:menu_icon="@drawable/ic_toys_36dp"
+        app:menu_labels_textColor="#FFFFFF"
+        app:menu_labels_textSize="15sp"
+        app:menu_labels_cornerRadius="8dp">
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/fabSearch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_colorNormal="@android:color/holo_purple"
+            app:fab_colorPressed="#E75043"
+            app:fab_colorRipple="#99FFFFFF"
+            app:fab_label="Geräte suchen"
+            app:fab_size="normal"
+            android:src="@drawable/ic_search_36dp"
+            tools:ignore="VectorDrawableCompat"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/fabStop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/disconnected_icon"
+            app:fab_colorNormal="@android:color/holo_purple"
+            app:fab_colorPressed="#E75043"
+            app:fab_colorRipple="#99FFFFFF"
+            app:fab_label="Verbindung trennen"
+            app:fab_size="normal"
+            tools:ignore="VectorDrawableCompat" />
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/fabDateien"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Vorhandene Dateien"
+            app:fab_size="normal"
+            app:fab_colorNormal="@android:color/holo_purple"
+            app:fab_colorPressed="#E75043"
+            app:fab_colorRipple="#99FFFFFF"
+            android:src="@drawable/ic_folder_36dp"
+            tools:ignore="VectorDrawableCompat" />
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/fabAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Action"
+            app:fab_size="normal"
+            app:fab_colorNormal="@android:color/holo_purple"
+            app:fab_colorPressed="#E75043"
+            app:fab_colorRipple="#99FFFFFF"
+            android:src="@drawable/ic_play_36dp"
+            tools:ignore="VectorDrawableCompat" />
+
+    </com.github.clans.fab.FloatingActionMenu>
+
+
+
+
+</RelativeLayout>

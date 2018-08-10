@@ -1,5 +1,6 @@
 package student.fh.sensorapplication.MPAndroidChart;
 
+
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -13,19 +14,25 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.support.annotation.NonNull;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
-import android.util.Log;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.mikephil.charting.charts.LineChart;
@@ -37,70 +44,72 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.utils.ColorTemplate;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
+import com.google.android.gms.nearby.Nearby;
+import com.google.android.gms.nearby.connection.Payload;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import student.fh.sensorapplication.Adapter.RecyclerViewAdapter;
+import student.fh.sensorapplication.Application.MyApplication;
+import student.fh.sensorapplication.Nearby.NearbyConnection;
 import student.fh.sensorapplication.R;
+import student.fh.sensorapplication.fragment.DialogFragmentClient;
 
 public class SensorGraphActivity extends AppCompatActivity implements SensorEventListener {
 
-    private FirebaseStorage storage = FirebaseStorage.getInstance();
-    private UploadTask uploadTask;
-    private StorageReference storageReference;
+    public static SensorManager sensorMgr = null;
+    public static Sensor aLinearSensor = null;
+    public static Sensor aSensor = null;
+    public static Sensor gSensor = null;
 
-    private SensorManager sensorMgr = null;
-    private Sensor aLinearSensor = null;
-    private Sensor aSensor = null;
-    private Sensor gSensor = null;
+    public static Handler mHandler;
+    public static Runnable mTimer;
 
-    private Handler mHandler;
-    private Runnable mTimer;
+    private RecyclerView.Adapter adapter;
+    private NearbyConnection nearbyConnection;
+
+    private AlertDialog mAlertDialog;
+    private ActionBar actionBar;
+    private Toolbar myToolbar;
 
     private boolean isGyroscope;
     private boolean isLinearAcc;
-    private boolean isRunning = false;
-    private boolean updateGraph = true;
+    public static boolean isRunning = false;
+    public static boolean updateGraph = true;
     private boolean isFilter = false;
-    private boolean isWriting = false;
+    public static boolean isWriting = false;
 
-    private float xAccel, yAccel, zAccel;
-    private float xGyro, yGyro, zGyro;
-    private float[] gravity = new float[3];
+    public static float xAccel, yAccel, zAccel;
+    public static float xGyro, yGyro, zGyro;
+    public static float[] gravity = new float[3];
 
-    private static final float NS2S = 1.0f / 1000000000.0f;
+    private final float NS2S = 1.0f / 1000000000.0f;
     private final float[] deltaRotationVector = new float[4];
     private float timestamp;
-    private static final int TIMEOUT = 100;  // 100 Millisecond
-    private static final long NanosecondToMillisecond = (long)1E6;
+    private final int TIMEOUT = 100;  // 100 Millisecond
+    private final long NanosecondToMillisecond = (long)1E6;
     private long lastTimestamp = -1;
-    private long startTime = 0;
+    public static long startTime = 0;
 
-    private String deviceModel = Build.MODEL;
-    private String databaseValue;
     private String comma = ";";
     private String fileName = "";
-    private StringBuffer buff = null;
-    private StringBuffer titlesBuffer = new StringBuffer();
+    public static StringBuffer buff;
 
-    private LineChart chartAccelerometer;
-    private LineChart chartGyroscope;
+    public static LineChart chartAccelerometer;
+    public static LineChart chartGyroscope;
+
+    private FragmentManager fm;
+    private DialogFragmentClient dialogFragmentClient;
 
 
     @Override
@@ -119,43 +128,28 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         setContentView(R.layout.activity_sensor_graph);
 
         // Toolbar
-        Toolbar myToolbar = findViewById(R.id.my_toolbar);
+        myToolbar = findViewById(R.id.my_toolbar);
         setSupportActionBar(myToolbar);
 
         // Actionbar
-        ActionBar ab = getSupportActionBar();
-        if(ab != null)
+        actionBar = getSupportActionBar();
+        if(actionBar != null)
         {
-            ab.setDisplayHomeAsUpEnabled(true);
+            actionBar.setDisplayHomeAsUpEnabled(true);
         }
+
+        nearbyConnection = new NearbyConnection(this, this);
+
+        adapter = new RecyclerViewAdapter(NearbyConnection.endPoints);
+        fm = getSupportFragmentManager();
+        dialogFragmentClient = DialogFragmentClient.newInstance("Hosts", adapter);
 
 
         // MPAndroidChart-Framework initialisieren
         chartAccelerometer = findViewById(R.id.chartAccelerometer);
         chartGyroscope     = findViewById(R.id.chartGyroscope);
 
-
         mHandler = new Handler();
-
-        // Titel für die Excel-Tabelle festlegen
-        titlesBuffer.append("Timestamp");
-        titlesBuffer.append(comma);
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Accelerometer X");
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Accelerometer Y");
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Accelerometer Z");
-        titlesBuffer.append(comma);
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Gyroscope X");
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Gyroscope Y");
-        titlesBuffer.append(comma);
-        titlesBuffer.append("Gyroscope Z");
-        titlesBuffer.append("\n");
-
-        // Die Sensoren werden auf Verfügbarkeit überprüft und registriert
         sensorMgr = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         if(sensorMgr != null)
@@ -198,83 +192,9 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
 
         initGraph(chartAccelerometer, "Accelerometer");
         initGraph(chartGyroscope, "Gyroscope");
-
-        // Das Firebase-Framework "Realtime Database" dient zum Starten der Geräte zur gleichen Zeit
-        DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference().child("sensor");
-        mDatabase.addValueEventListener(new ValueEventListener()
-        {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot)
-            {
-                try
-                {
-                    databaseValue = dataSnapshot.getValue(String.class);
-
-                    if(databaseValue != null)
-                    {
-                        if(databaseValue.equalsIgnoreCase("start"))
-                        {
-                            chartAccelerometer.clearValues();
-                            chartGyroscope.clearValues();
-                            sensorMgr.registerListener(SensorGraphActivity.this, aLinearSensor, SensorManager.SENSOR_DELAY_FASTEST);
-                            sensorMgr.registerListener(SensorGraphActivity.this, aSensor, SensorManager.SENSOR_DELAY_FASTEST);
-                            sensorMgr.registerListener(SensorGraphActivity.this, gSensor, SensorManager.SENSOR_DELAY_FASTEST);
-                            startTime = System.currentTimeMillis();
-                            isRunning = !isRunning;
-                            updateGraph = true;
-                            isWriting = true;
-                            buff = new StringBuffer();
-                            buff.delete(0, buff.length());
-                            invalidateOptionsMenu();
-                            feedSensor();
-                        }
-                        else if(databaseValue.equalsIgnoreCase("stop"))
-                        {
-                            isRunning = !isRunning;
-                            updateGraph = false;
-                            invalidateOptionsMenu();
-                            mHandler.removeCallbacks(mTimer);
-                            mHandler.removeCallbacksAndMessages(null);
-                            sensorMgr.unregisterListener(SensorGraphActivity.this);
-                        }
-                        else if(databaseValue.equalsIgnoreCase("save"))
-                        {
-                            if(buff != null)
-                            {
-                                saveFileToFireBaseStorage();
-                            }
-                            else
-                            {
-                                Toast.makeText(SensorGraphActivity.this, "Keine Daten vorhanden. Bitte zuerst starten!", Toast.LENGTH_LONG).show();
-                            }
-
-                        }
-                        else
-                        {
-                            Toast.makeText(SensorGraphActivity.this, "Warten auf Start!", Toast.LENGTH_LONG).show();
-                        }
-                    }
-                    else
-                    {
-                        Toast.makeText(SensorGraphActivity.this, "Firebase: null", Toast.LENGTH_LONG).show();
-                    }
-                }
-                catch (NullPointerException e)
-                {
-                    Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError)
-            {
-                Log.e("onCancelled", String.valueOf(databaseError.toException().getMessage()));
-            }
-        });
     }
 
-
-    private void initGraph(LineChart mChart, String description)
+    private static void initGraph(LineChart mChart, String description)
     {
         mChart.setTouchEnabled(true);
         mChart.setDragEnabled(true);
@@ -316,8 +236,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         rightAxis.setEnabled(false);
     }
 
-
-    private void addEntry(LineChart chart, Float valueX, Float valueY, Float valueZ)
+    private static void addEntry(LineChart chart, Float valueX, Float valueY, Float valueZ)
     {
         LineData data = chart.getData();
 
@@ -353,8 +272,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         }
     }
 
-
-    private LineDataSet createSet(String label, Integer color)
+    private static LineDataSet createSet(String label, Integer color)
     {
         LineDataSet set = new LineDataSet(null, label);
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
@@ -372,8 +290,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         return set;
     }
 
-
-    private void feedSensor()
+    public static void feedSensor()
     {
         mTimer = new Runnable() {
             @Override
@@ -390,14 +307,24 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         };
 
         mHandler.postDelayed(mTimer, 0);
-    }
 
+        /*try
+        {
+            Nearby.getConnectionsClient(MyApplication.getAppContext())
+                    .sendPayload(
+                            NearbyConnection.hostEndpointId,
+                            Payload.fromBytes("isActive".getBytes("UTF-8")));
+        }
+        catch (UnsupportedEncodingException e)
+        {
+            e.printStackTrace();
+        }*/
+    }
 
     @Override
     public void onResume()
     {
         super.onResume();
-        revokePermission();
 
         if(sensorMgr.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) != null)
         {
@@ -433,6 +360,11 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             Toast.makeText(this, "Kein Accelerometer Sensor vorhanden!", Toast.LENGTH_LONG).show();
         }
 
+
+        buff = new StringBuffer();
+        //titlesBuffer = new StringBuffer();
+        nearbyConnection.endPoints.clear();
+        adapter.notifyDataSetChanged();
     }
 
     @Override
@@ -443,6 +375,13 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         mHandler.removeCallbacks(mTimer);
         mHandler.removeCallbacksAndMessages(null);
         sensorMgr.unregisterListener(this);
+
+        nearbyConnection.endPoints.clear();
+        adapter.notifyDataSetChanged();
+
+        Nearby.getConnectionsClient(this).stopDiscovery();
+        Nearby.getConnectionsClient(this).stopAdvertising();
+        Nearby.getConnectionsClient(this).stopAllEndpoints();
     }
 
     @Override
@@ -450,16 +389,22 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
     {
         super.onDestroy();
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        nearbyConnection.endPoints.clear();
+        adapter.notifyDataSetChanged();
+
+        Nearby.getConnectionsClient(this).stopDiscovery();
+        Nearby.getConnectionsClient(this).stopAdvertising();
+        Nearby.getConnectionsClient(this).stopAllEndpoints();
+
         finish();
     }
-
 
     @Override
     public void onBackPressed() {
         super.onBackPressed();
-        storage = null;
         sensorMgr.unregisterListener(this);
-        buff = null;
+        buff.setLength(0);
     }
 
     @Override
@@ -567,23 +512,31 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         {
             if(elapsedTime >= TIMEOUT)
             {
-                String dateString = String.format(Locale.GERMANY, "%02d:%02d.%d", minute, second, (millis / 100 * 100));
+                String dateString = String.format(Locale.GERMAN, "%02d:%02d.%d", minute, second, (millis / 100 * 100));
+
+                String xA = String.format(Locale.GERMAN, "%.6f", xAccel);
+                String yA = String.format(Locale.GERMAN, "%.6f", yAccel);
+                String zA = String.format(Locale.GERMAN, "%.6f", zAccel);
+                String xG = String.format(Locale.GERMAN, "%.6f", xGyro);
+                String yG = String.format(Locale.GERMAN, "%.6f", yGyro);
+                String zG = String.format(Locale.GERMAN, "%.6f", zGyro);
+
 
                 buff.append(String.valueOf(dateString));
                 buff.append(comma);
                 buff.append(comma);
-                buff.append(String.valueOf(xAccel));
+                buff.append(xA);
                 buff.append(comma);
-                buff.append(String.valueOf(yAccel));
+                buff.append(yA);
                 buff.append(comma);
-                buff.append(String.valueOf(zAccel));
+                buff.append(zA);
                 buff.append(comma);
                 buff.append(comma);
-                buff.append(String.valueOf(xGyro));
+                buff.append(xG);
                 buff.append(comma);
-                buff.append(String.valueOf(yGyro));
+                buff.append(yG);
                 buff.append(comma);
-                buff.append(String.valueOf(zGyro));
+                buff.append(zG);
                 buff.append("\n");
 
                 lastTimestamp = currentTimestamp;
@@ -603,14 +556,7 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
         boolean isChecked = loadState("checkboxValue");
         MenuItem item = menu.findItem(R.id.action_filter);
         item.setChecked(isChecked);
-        if(item.isChecked())
-        {
-            isFilter = true;
-        }
-        else
-        {
-            isFilter = false;
-        }
+        isFilter = item.isChecked();
 
         return super.onCreateOptionsMenu(menu);
     }
@@ -641,11 +587,11 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             case R.id.action_resume:
                 onResume();
                 startTime = System.currentTimeMillis();
+                buff = new StringBuffer();
+                buff.delete(0, buff.length());
                 isRunning = !isRunning;
                 updateGraph = true;
                 isWriting = true;
-                buff = new StringBuffer();
-                buff.delete(0, buff.length());
                 feedSensor();
                 invalidateOptionsMenu();
                 break;
@@ -661,6 +607,10 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             case R.id.action_share:
                 return true;
 
+            case R.id.action_search:
+                nearbyConnection.startDiscovery(SensorGraphActivity.this);
+                break;
+
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -673,175 +623,137 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
     {
         if (isRunning)
         {
-            menu.findItem(R.id.action_resume).setVisible(true);
-            menu.findItem(R.id.action_stop).setVisible(false);
-        } else {
             menu.findItem(R.id.action_resume).setVisible(false);
             menu.findItem(R.id.action_stop).setVisible(true);
+        } else {
+            menu.findItem(R.id.action_resume).setVisible(true);
+            menu.findItem(R.id.action_stop).setVisible(false);
         }
 
         return super.onPrepareOptionsMenu(menu);
     }
 
-
     private void fileSaveDialog()
     {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Filename");
+        if(!buff.toString().isEmpty())
+        {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Filename");
 
-        final EditText input = new EditText(this);
-        input.setHint("your_filename");
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        builder.setView(input);
+            final EditText input = new EditText(this);
+            input.setHint("your_filename");
+            input.setInputType(InputType.TYPE_CLASS_TEXT);
+            builder.setView(input);
 
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                fileName = (input.getText().toString());
-                saveFile();
-                saveFileToFireBaseStorage(fileName);
-            }
-        });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-            }
-        });
+            builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    fileName = (input.getText().toString());
+                    saveFile();
+                }
+            });
+            builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.cancel();
+                }
+            });
 
-        AlertDialog dialog = builder.create();
+            AlertDialog dialog = builder.create();
 
-        dialog.show();
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getResources().getColor(android.R.color.holo_red_dark));
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+            dialog.show();
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+        }
+        else
+        {
+            Toast.makeText(getApplicationContext(), "Keine Daten vorhanden!", Toast.LENGTH_LONG).show();
+        }
+
     }
-
 
     private void saveFile()
     {
-        String finalFilename = fileName + ".csv";
+        String ordnerName = "Sensordaten";
+        String dateiName = fileName + Build.MODEL + "_" + new Date() + ".csv";
 
         File path = null;
         File file = null;
         BufferedWriter bwr = null;
 
-        if(!buff.toString().isEmpty())
+        try
+        {
+            path = new File(MyApplication.getAppContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), ordnerName);
+            file = new File(path, dateiName);
+            bwr = new BufferedWriter(new FileWriter(file));
+        }
+        catch (FileNotFoundException e)
+        {
+            e.printStackTrace();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        if(!path.mkdirs())
+        {
+            path.mkdir();
+        }
+
+        if (!file.exists())
         {
             try
             {
-                path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
-                file = new File(path, finalFilename);
-                bwr = new BufferedWriter(new FileWriter(file));
-            }
-            catch (FileNotFoundException e)
-            {
-                e.printStackTrace();
+                file.createNewFile();
             }
             catch (IOException e)
             {
                 e.printStackTrace();
             }
+        }
 
-
-            if (!file.exists())
+        try
+        {
+            if (bwr != null)
+            {
+                bwr.append(buff.toString());
+                bwr.flush();
+            }
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            if (bwr != null)
             {
                 try
                 {
-                    file.createNewFile();
+                    bwr.close();
                 }
                 catch (IOException e)
                 {
                     e.printStackTrace();
                 }
             }
-
-            try
-            {
-                bwr.append(titlesBuffer.toString());
-                bwr.append(buff.toString());
-                bwr.flush();
-                bwr.close();
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-
-            Toast.makeText(getApplicationContext(), "Datei wurde hier gespeichert: " + path.getAbsolutePath(),
-                    Toast.LENGTH_LONG).show();
         }
-        else
-        {
-            Toast.makeText(getApplicationContext(), "Keine Daten vorhanden!", Toast.LENGTH_LONG).show();
-        }
+
+        Toast.makeText(getApplicationContext(), "Datei wurde hier gespeichert: " + path.getAbsolutePath(),
+                Toast.LENGTH_LONG).show();
+
     }
-
-
-    private void saveFileToFireBaseStorage()
-    {
-        byte[] one = String.valueOf(titlesBuffer).getBytes();
-        byte[] two = String.valueOf(buff).getBytes();
-        byte[] combined = new byte[one.length + two.length];
-        System.arraycopy(one,0,combined,0         ,one.length);
-        System.arraycopy(two,0,combined,one.length,two.length);
-
-        String mPath = "Sensordaten/" + deviceModel + "_" + new Date().getTime() + ".csv";
-        storageReference = storage.getReference(mPath);
-        uploadTask = storageReference.putBytes(combined);
-        uploadTask.addOnSuccessListener(SensorGraphActivity.this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
-            @Override
-            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot)
-            {
-                Toast.makeText(SensorGraphActivity.this, "Zu Firebase Storage hinzugefügt!", Toast.LENGTH_LONG).show();
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception e)
-            {
-                Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
-
-    private void saveFileToFireBaseStorage(String fileName)
-    {
-        byte[] one = String.valueOf(titlesBuffer).getBytes();
-        byte[] two = String.valueOf(buff).getBytes();
-        byte[] combined = new byte[one.length + two.length];
-        System.arraycopy(one,0,combined,0         ,one.length);
-        System.arraycopy(two,0,combined,one.length,two.length);
-
-        String mPath = "Sensordaten/" + deviceModel + "_" + fileName + ".csv";
-        storageReference = storage.getReference(mPath);
-        uploadTask = storageReference.putBytes(combined);
-        uploadTask.addOnSuccessListener(SensorGraphActivity.this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
-            @Override
-            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot)
-            {
-                Toast.makeText(SensorGraphActivity.this, "Zu Firebase Storage hinzugefügt!", Toast.LENGTH_LONG).show();
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception e)
-            {
-                Toast.makeText(SensorGraphActivity.this, "Fehler: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
 
     private void shareFile()
     {
         String str = buff.toString();
-        String titles = titlesBuffer.toString();
 
-        if(!str.isEmpty())
+        if(str.length() != 0)
         {
             Intent intent = new Intent();
             intent.setAction(Intent.ACTION_SEND);
             intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_TEXT, titles);
             intent.putExtra(Intent.EXTRA_TEXT, str);
             startActivity(intent);
         }
@@ -850,16 +762,6 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
             Toast.makeText(getApplicationContext(), "Keine Daten vorhanden!", Toast.LENGTH_LONG).show();
         }
 
-    }
-
-    public void revokePermission()
-    {
-        String fileName = "Accelerometer.csv";
-
-        File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
-        File file = new File(path, fileName);
-        Uri uri = FileProvider.getUriForFile(getApplicationContext(), "student.fh.sensorapplication", file);
-        revokeUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
     }
 
     private void saveState(final boolean isChecked, String value) {
@@ -872,6 +774,172 @@ public class SensorGraphActivity extends AppCompatActivity implements SensorEven
     private boolean loadState(String value) {
         SharedPreferences sharedPref = getSharedPreferences(value, MODE_PRIVATE);
         return sharedPref.getBoolean("checkboxState", false);
+    }
+
+    public void setProgressDialog(String text)
+    {
+        int llPadding = 30;
+        LinearLayout ll = new LinearLayout(this);
+        ll.setOrientation(LinearLayout.HORIZONTAL);
+        ll.setPadding(llPadding, llPadding, llPadding, llPadding);
+        ll.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams llParam = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        llParam.gravity = Gravity.CENTER;
+        ll.setLayoutParams(llParam);
+
+        ProgressBar progressBar = new ProgressBar(this);
+        progressBar.setIndeterminate(true);
+        progressBar.setPadding(0, 0, llPadding, 0);
+        progressBar.setLayoutParams(llParam);
+
+        llParam = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        llParam.gravity = Gravity.CENTER;
+        TextView tvText = new TextView(this);
+        tvText.setText(text);
+        tvText.setTextColor(Color.parseColor("#000000"));
+        tvText.setTextSize(20);
+        tvText.setLayoutParams(llParam);
+
+        ll.addView(progressBar);
+        ll.addView(tvText);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setCancelable(true);
+        builder.setView(ll);
+
+        mAlertDialog = builder.create();
+        mAlertDialog.show();
+        Window window = mAlertDialog.getWindow();
+        if (window != null) {
+            WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
+            layoutParams.copyFrom(mAlertDialog.getWindow().getAttributes());
+            layoutParams.width = LinearLayout.LayoutParams.WRAP_CONTENT;
+            layoutParams.height = LinearLayout.LayoutParams.WRAP_CONTENT;
+            mAlertDialog.getWindow().setAttributes(layoutParams);
+        }
+    }
+
+    public void removeProgressDialog()
+    {
+        mAlertDialog.dismiss();
+    }
+
+    public void showCustomDialog()
+    {
+        if(!dialogFragmentClient.isAdded())
+        {
+            dialogFragmentClient.setStyle(DialogFragment.STYLE_NORMAL, R.style.CustomDialog);
+            dialogFragmentClient.show(fm, "hosts_fragment");
+        }
+    }
+
+    public void sendPayloadFile(StringBuffer buff, StringBuffer titlesBuffer)
+    {
+        String finalFilename = Build.MODEL;
+
+        File file = null;
+        BufferedWriter bwr = null;
+
+        if(!buff.toString().isEmpty())
+        {
+            try
+            {
+                file = new File(MyApplication.getAppContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), finalFilename);
+                bwr = new BufferedWriter(new FileWriter(file));
+            }
+            catch (FileNotFoundException e)
+            {
+                e.printStackTrace();
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+
+            try
+            {
+                if (bwr != null)
+                {
+                    bwr.append(titlesBuffer.toString());
+                    bwr.append(buff.toString());
+                    bwr.flush();
+                }
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+            finally
+            {
+                if (bwr != null)
+                {
+                    try
+                    {
+                        bwr.close();
+                    }
+                    catch (IOException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        try
+            {
+                try
+                {
+                    Nearby.getConnectionsClient(MyApplication.getAppContext())
+                            .sendPayload(
+                                    NearbyConnection.hostEndpointId,
+                                    Payload.fromBytes(finalFilename.getBytes("UTF-8")));
+                }
+                catch (UnsupportedEncodingException e)
+                {
+                    e.printStackTrace();
+                }
+
+                Nearby.getConnectionsClient(MyApplication.getAppContext())
+                        .sendPayload(
+                                NearbyConnection.hostEndpointId,
+                                Payload.fromFile(file));
+            }
+            catch (FileNotFoundException e)
+            {
+                e.printStackTrace();
+            }
+    }
+
+    public static void sendPayloadStream(StringBuffer buff)
+    {
+        String finalFilename = Build.MODEL;
+        byte[] bytes = buff.toString().getBytes();
+        InputStream inputStream = new ByteArrayInputStream(bytes);
+
+        try
+        {
+            Nearby.getConnectionsClient(MyApplication.getAppContext())
+                    .sendPayload(
+                            NearbyConnection.hostEndpointId,
+                            Payload.fromBytes(finalFilename.getBytes("UTF-8")));
+
+            Nearby.getConnectionsClient(MyApplication.getAppContext())
+                    .sendPayload(
+                            NearbyConnection.hostEndpointId,
+                            Payload.fromStream(inputStream));
+        }
+        catch (UnsupportedEncodingException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    public static void stopDiscovering()
+    {
+        Nearby.getConnectionsClient(MyApplication.getAppContext()).stopDiscovery();
     }
 }
 

@@ -6,17 +6,17 @@
 
     <item
         android:id="@+id/action_settings"
-        android:title="Settings"
+        android:title="@string/settings"
         app:showAsAction="always"
         android:icon="@drawable/ic_sensor">
 
         <menu>
             <item
                 android:id="@+id/action_filter"
-                android:title="Filter"
+                android:title="@string/filter"
                 android:checkable="true"
                 app:actionViewClass="android.widget.CheckBox"
-                app:showAsAction="always">
+                app:showAsAction="ifRoom">
             </item>
         </menu>
 
@@ -25,42 +25,51 @@
     <item
         android:id="@+id/action_stop"
         android:orderInCategory="100"
-        android:title="Pause"
+        android:title="@string/pause"
         app:showAsAction="always"
         android:icon="@drawable/ic_stop_24dp" />
 
     <item
         android:id="@+id/action_resume"
         android:orderInCategory="100"
-        android:title="Resume"
+        android:title="@string/resume"
         app:showAsAction="always"
-        android:icon="@drawable/ic_record_24dp" />
+        android:icon="@drawable/ic_play_36dp" />
 
     <item
         android:id="@+id/action_share"
         android:orderInCategory="100"
-        android:title="Share"
+        android:title="@string/share"
         app:showAsAction="always"
         android:icon="@drawable/ic_share">
 
         <menu>
+
             <item
                 android:id="@+id/action_send"
                 android:orderInCategory="100"
-                android:title="Send"
-                app:showAsAction="ifRoom"
-                android:icon="@drawable/ic_menu_send">
-            </item>
+                android:title="@string/share"
+                app:showAsAction="ifRoom|withText"
+                android:icon="@drawable/ic_menu_send"/>
+
             <item
                 android:id="@+id/action_save"
                 android:orderInCategory="100"
-                android:title="Save"
-                app:showAsAction="ifRoom"
-                android:icon="@drawable/ic_save">
-            </item>
+                android:title="@string/save"
+                app:showAsAction="ifRoom|withText"
+                android:icon="@drawable/ic_save"/>
+
+            <item
+                android:id="@+id/action_search"
+                android:orderInCategory="100"
+                android:title="@string/hosts_suchen"
+                app:showAsAction="ifRoom|withText"
+                android:icon="@drawable/ic_search_24dp"/>
+
         </menu>
 
     </item>
-        <!--app:actionProviderClass="android.support.v7.widget.ShareActionProvider"-->
+
+
 
 </menu>

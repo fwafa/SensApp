@@ -2,8 +2,11 @@
 <resources>
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#b7999999</color>
+    <!--color name="colorAccent">#b7999999</color!-->
+    <color name="colorAccent">#ff548d</color>
     <color name="colorDark">#c8ffffff</color>
     <color name="whiteColor">#ffffff</color>
     <color name="blackColor">#000000</color>
+    <color name="alertButtonColor">#ff548d</color>
+    <color name="mColorAccent">#ff548d</color>
 </resources>

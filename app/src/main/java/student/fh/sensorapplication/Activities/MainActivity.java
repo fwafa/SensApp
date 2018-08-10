@@ -1,13 +1,13 @@
 package student.fh.sensorapplication.Activities;
 
-import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GestureDetectorCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -20,15 +20,14 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import student.fh.sensorapplication.MPAndroidChart.SensorGraphActivity;
+import student.fh.sensorapplication.Permissions.PermissionManager;
 import student.fh.sensorapplication.R;
 
 public class MainActivity extends AppCompatActivity {
 
-    private final Integer REQUEST_PERMISSION = 1;
-
+    private PermissionManager permissionManager;
     private GestureDetectorCompat gestureObject;
 
 
@@ -80,14 +79,22 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        askForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, REQUEST_PERMISSION);
-
-        Button startButton = findViewById(R.id.start_btn);
-        startButton.setOnClickListener(new View.OnClickListener() {
+        Button clientButton = findViewById(R.id.client_btn);
+        clientButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
 
                 Intent intent = new Intent(MainActivity.this, SensorGraphActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        Button hostButton = findViewById(R.id.host_btn);
+        hostButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Intent intent = new Intent(MainActivity.this, NearbyActivity.class);
                 startActivity(intent);
             }
         });
@@ -103,49 +110,92 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
         gestureObject = new GestureDetectorCompat(this, new MyGestureClass());
-
-    }
-
-    private void askForPermission(String permission, Integer requestCode) {
-        if (ContextCompat.checkSelfPermission(MainActivity.this, permission) != PackageManager.PERMISSION_GRANTED) {
-
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, permission)) {
-
-                //This is called if user has denied the permission before
-                //In this case I am just asking the permission again
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{permission}, requestCode);
-
-            } else {
-
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{permission}, requestCode);
-            }
-        }
-        /*else
-        {
-            Toast.makeText(this, "" + permission + " is already granted.", Toast.LENGTH_LONG).show();
-        }*/
     }
 
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    protected void onStart() {
+        super.onStart();
+        statusCheck();
+    }
 
-        if(requestCode == REQUEST_PERMISSION)
+
+    public void statusCheck()
+    {
+        final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        boolean isGpsEnabled;
+
+        if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            buildAlertMessageNoGps();
+            isGpsEnabled = false;
+        }
+        else
         {
-            if(grantResults[0] == PackageManager.PERMISSION_GRANTED)
-            {
-
-            }
-            else
-            {
-                Toast.makeText(this, "Permission was not granted", Toast.LENGTH_LONG).show();
-            }
+            isGpsEnabled = true;
         }
 
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (isGpsEnabled)
+        {
+            permissionManager = new PermissionManager(this) {
+                @Override
+                public void ifCancelledAndCanRequest(Activity activity) {
+                    super.ifCancelledAndCanRequest(MainActivity.this);
+                }
+
+                @Override
+                public void ifCancelledAndCannotRequest(Activity activity) {
+                    super.ifCancelledAndCannotRequest(MainActivity.this);
+                }
+            };
+
+            permissionManager.checkAndRequestPermissions(this);
+        }
+
+    }
+
+
+    private void buildAlertMessageNoGps()
+    {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("GPS ist deaktiviert");
+        builder.setMessage("GPS ist ausgeschaltet. Bevor Sie fortfahren, muss es aktiviert werden." +
+                " Möchten Sie es aktivieren? Falls Sie Nein wählen, wird die App beendet!")
+                .setCancelable(false)
+                .setPositiveButton("Ja", new DialogInterface.OnClickListener()
+                {
+                    public void onClick(final DialogInterface dialog, final int id)
+                    {
+                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                })
+                .setNegativeButton("Nein", new DialogInterface.OnClickListener()
+                {
+                    public void onClick(final DialogInterface dialog, final int id)
+                    {
+                        dialog.cancel();
+                        finishAffinity();
+                    }
+                });
+        final AlertDialog alert = builder.create();
+
+        alert.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dialog) {
+
+                alert.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getResources().getColor(R.color.alertButtonColor));
+                alert.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getResources().getColor(R.color.alertButtonColor));
+            }
+        });
+
+        alert.show();
+    }
+
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,String permissions[], int[] grantResults) {
+        permissionManager.checkResult(requestCode,permissions, grantResults);
     }
 
 
@@ -165,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
             if(e2.getX() > e1.getX())
             {
                 // swipe left to right
-                Intent intent = new Intent(MainActivity.this, FireBaseActivity.class);
+                Intent intent = new Intent(MainActivity.this, NearbyActivity.class);
                 startActivity(intent);
                 overridePendingTransition(R.anim.slide_from_left, R.anim.slide_to_right);
 
@@ -173,6 +223,9 @@ public class MainActivity extends AppCompatActivity {
             else if(e2.getX() < e1.getX())
             {
                 // swipe right to left
+                Intent intent = new Intent(MainActivity.this, SensorGraphActivity.class);
+                startActivity(intent);
+                overridePendingTransition(R.anim.slide_from_right, R.anim.slide_to_left);
             }
 
             return true;

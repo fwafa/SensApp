@@ -1,5 +1,4 @@
 # SensApp
-Sensor Graf App
 
 Mit dem App ist es möglich die Daten der Bewegungssensoren Accelerometer und Gyroskop grafisch
 darzustellen und diese dann zur Weiterbearbeitung bereitstellen. 
